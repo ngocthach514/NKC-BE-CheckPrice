@@ -5,39 +5,44 @@ const BaseHandler = require("./BaseHandler");
 const apiHandlers = {};
 const htmlHandlers = {};
 
-fs.readdirSync(path.join(__dirname, "api")).forEach((file) => {
+const apiDir = path.join(__dirname, "api");
+fs.readdirSync(apiDir).forEach((file) => {
   if (file.endsWith("Handler.js")) {
-    const HandlerClass = require(`./api/${file}`);
+    const fullPath = path.join(apiDir, file);
+    const HandlerClass = require(fullPath);
     const key = file.replace("Handler.js", "").toLowerCase();
     apiHandlers[key] = HandlerClass;
   }
 });
 
-fs.readdirSync(path.join(__dirname, "html")).forEach((file) => {
+const htmlDir = path.join(__dirname, "html");
+fs.readdirSync(htmlDir).forEach((file) => {
   if (file.endsWith("Handler.js")) {
-    const HandlerClass = require(`./html/${file}`);
+    const fullPath = path.join(htmlDir, file);
+    const HandlerClass = require(fullPath);
     const key = file.replace("Handler.js", "").toLowerCase();
     htmlHandlers[key] = HandlerClass;
   }
 });
 
 function getHandler(site) {
-  const namePart = site.name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
-  const domainPart = getDomain(site.url);
-  const key = `${namePart}-${domainPart}`;
+  const key = site.handler_key || (
+    site.name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '') +
+    '-' +
+    getDomain(site.url)
+  );
 
   if (site.has_api && apiHandlers[key]) {
     return new apiHandlers[key](site);
   }
 
-  if (!site.has_api && htmlHandlers[namePart]) {
-    return new htmlHandlers[namePart](site);
+  if (!site.has_api && htmlHandlers[key]) {
+    return new htmlHandlers[key](site);
   }
 
   console.warn(`⚠️ Không tìm thấy handler cho site: ${site.name} (${key})`);
   return new BaseHandler(site);
 }
-
 
 function getDomain(url) {
   try {

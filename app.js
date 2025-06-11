@@ -1,19 +1,24 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const uploadRoute = require('./routes/upload');
-const searchRoute = require('./routes/search');
-const historyRoute = require('./routes/history');
-
+const express = require("express");
+const path = require("path");
 const app = express();
-app.use(cors());
+const searchRouter = require("./routes/search");
+
+require("dotenv").config();
+
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-app.use('/upload', uploadRoute);
-app.use('/search', searchRoute);
-app.use('/history', historyRoute);
+// Route API
+app.use("/api", searchRouter);
 
-const PORT = process.env.PORT || 3001;
+// Nếu vẫn muốn phục vụ frontend:
+app.use(express.static(path.join(__dirname, "public")));
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`✅ Server is running at http://localhost:${PORT}`);
 });
