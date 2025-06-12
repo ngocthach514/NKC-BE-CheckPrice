@@ -10,25 +10,18 @@ function calculateDifference(original, current) {
 
 function getClientIp(req) {
   return (
-    req.headers['x-forwarded-for']?.split(',')[0] ||
+    req.headers["x-forwarded-for"]?.split(",")[0] ||
     req.connection?.remoteAddress ||
     req.socket?.remoteAddress ||
-    'unknown'
+    "unknown"
   );
-}
-
-function withTimeout(promise, ms = 15000) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))
-  ]);
 }
 
 async function batchExecute(tasks = [], batchSize = 5) {
   const results = [];
   for (let i = 0; i < tasks.length; i += batchSize) {
     const batch = tasks.slice(i, i + batchSize);
-    const settled = await Promise.allSettled(batch.map(fn => fn()));
+    const settled = await Promise.allSettled(batch.map((fn) => fn()));
     for (const res of settled) {
       if (res.status === "fulfilled" && res.value) {
         results.push(res.value);
@@ -44,9 +37,11 @@ router.get("/search", async (req, res) => {
     return res.status(400).json({ error: "Query parameter 'q' is required" });
   }
 
-  const pairs = q.split("|").map(p => p.split(","));
+  const pairs = q.split("|").map((p) => p.split(","));
   if (pairs.length > 10) {
-    return res.status(400).json({ error: "Tối đa 10 từ khóa mỗi truy vấn" });
+    return res
+      .status(400)
+      .json({ error: "Tối đa 10 từ khóa mỗi truy vấn" });
   }
 
   const connection = await pool.getConnection();
@@ -72,7 +67,7 @@ router.get("/search", async (req, res) => {
             const handler = getHandler(site);
             if (!handler || typeof handler.search !== "function") return;
 
-            const result = await withTimeout(handler.search(keyword), 15000);
+            const result = await handler.search(keyword);
             if (result.status !== "FOUND") return;
 
             const foundPrice = parseFloat(result.price);
@@ -86,10 +81,15 @@ router.get("/search", async (req, res) => {
               timestamp,
               site: site.name,
               gianhap: hasPrice ? priceOrigin.toString() : "0.0",
-              tilechenhlech: hasPrice ? calculateDifference(priceOrigin, foundPrice).toString() : "0.0"
+              tilechenhlech: hasPrice
+                ? calculateDifference(priceOrigin, foundPrice).toString()
+                : "0.0",
             };
           } catch (err) {
-            console.error(`❌ Lỗi tại site "${site.name}" với '${keyword}':`, err.message);
+            console.error(
+              `❌ Lỗi tại site "${site.name}" với '${keyword}':`,
+              err.message
+            );
           }
         });
       }

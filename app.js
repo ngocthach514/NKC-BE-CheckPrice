@@ -1,6 +1,8 @@
 const express = require("express");
 const app = express();
 const searchRouter = require("./routes/search");
+const checkApiSitesRoute = require('./routes/checkApiSites');
+const checkAllHandlersRoute = require('./routes/checkAllHandlers');
 
 require("dotenv").config();
 
@@ -14,6 +16,9 @@ app.use("/api", searchRouter);
 app.get("/", (req, res) => {
   res.json({ status: "ok", message: "CheckGia API is running." });
 });
+
+app.use('/check-api-sites', checkApiSitesRoute);
+app.use('/check-all-handlers', checkAllHandlersRoute);
 
 const PORT = process.env.PORT || 3033;
 app.listen(PORT, () => {
