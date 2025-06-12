@@ -36,7 +36,8 @@ router.get("/search", async (req, res) => {
 
     const keywordPromises = pairs.map(async ([keyword, inputPrice]) => {
       const priceOrigin = parseFloat(inputPrice);
-      if (!keyword || isNaN(priceOrigin)) return [];
+      const hasPrice = !isNaN(priceOrigin);
+      if (!keyword) return [];
 
       const sitePromises = websites.map(async (site) => {
         try {
@@ -47,17 +48,17 @@ router.get("/search", async (req, res) => {
             const foundPrice = parseFloat(result.price);
             if (isNaN(foundPrice)) return null;
 
-            const diff = calculateDifference(priceOrigin, foundPrice);
-
-            return {
-              gianhap: priceOrigin.toString(),
-              ip,
+            const response = {
               name: `${result.name} (${result.link})`,
               price: foundPrice.toString(),
-              tilechenhlech: diff.toString(),
               serial: result.serial || null,
-              timestamp
+              ip,
+              timestamp,
+              gianhap: hasPrice ? priceOrigin.toString() : "0.0",
+              tilechenhlech: hasPrice ? calculateDifference(priceOrigin, foundPrice).toString() : "0.0"
             };
+
+            return response;
           }
         } catch (err) {
           console.error(`❌ Lỗi tại site "${site.name}":`, err.message);
