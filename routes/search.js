@@ -44,7 +44,10 @@ router.get("/search", async (req, res) => {
 
   const connection = await pool.getConnection();
   const ip = getClientIp(req);
-  const timestamp = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const timestamp = new Date(Date.now() + 7 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 19)
+    .replace("T", " ");
 
   try {
     const [websites] = await connection.query(
@@ -72,16 +75,16 @@ router.get("/search", async (req, res) => {
             if (isNaN(foundPrice)) return;
 
             return {
+              gianhap: hasPrice ? priceOrigin.toString() : "0.0",
+              ip,
               name: `${result.name} (${result.link})`,
               price: foundPrice.toString(),
-              serial: result.serial || null,
-              ip,
-              timestamp,
-              site: site.name,
-              gianhap: hasPrice ? priceOrigin.toString() : "0.0",
+              serial: keyword,
               tilechenhlech: hasPrice
                 ? calculateDifference(priceOrigin, foundPrice).toString()
                 : "0.0",
+              timestamp,
+              site: site.name,
             };
           } catch (err) {
             console.error(
@@ -94,7 +97,8 @@ router.get("/search", async (req, res) => {
     }
 
     const output = await batchExecute(allTasks, 10);
-    res.json({ status: "success", data: output });
+
+    res.json(Object.assign({ data: output }, { status: "success" }));
   } catch (err) {
     console.error("❌ Lỗi tổng:", err.stack || err.message);
     res.status(500).json({ error: "Internal server error" });
