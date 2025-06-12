@@ -17,6 +17,27 @@ function getClientIp(req) {
   );
 }
 
+function withTimeout(promise, ms = 15000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))
+  ]);
+}
+
+async function batchExecute(tasks = [], batchSize = 5) {
+  const results = [];
+  for (let i = 0; i < tasks.length; i += batchSize) {
+    const batch = tasks.slice(i, i + batchSize);
+    const settled = await Promise.allSettled(batch.map(fn => fn()));
+    for (const res of settled) {
+      if (res.status === "fulfilled" && res.value) {
+        results.push(res.value);
+      }
+    }
+  }
+  return results;
+}
+
 router.get("/search", async (req, res) => {
   const { q } = req.query;
   if (!q || q.trim() === "") {
@@ -24,61 +45,57 @@ router.get("/search", async (req, res) => {
   }
 
   const pairs = q.split("|").map(p => p.split(","));
+  if (pairs.length > 10) {
+    return res.status(400).json({ error: "Tối đa 10 từ khóa mỗi truy vấn" });
+  }
+
   const connection = await pool.getConnection();
   const ip = getClientIp(req);
   const timestamp = new Date().toISOString().slice(0, 19).replace("T", " ");
-  const output = [];
 
   try {
     const [websites] = await connection.query(
       "SELECT * FROM websites WHERE has_api = 1 AND handler_key IS NOT NULL"
     );
 
-    const keywordPromises = pairs.map(async ([keyword, inputPrice]) => {
+    const allTasks = [];
+
+    for (const [keyword, inputPrice] of pairs) {
+      if (!keyword) continue;
+
       const priceOrigin = parseFloat(inputPrice);
       const hasPrice = !isNaN(priceOrigin);
-      if (!keyword) return [];
 
-      const sitePromises = websites.map(async (site) => {
-        try {
-          const handler = getHandler(site);
-          const result = await handler.search(keyword);
+      for (const site of websites) {
+        allTasks.push(async () => {
+          try {
+            const handler = getHandler(site);
+            if (!handler || typeof handler.search !== "function") return;
 
-          if (result.status === "FOUND") {
+            const result = await withTimeout(handler.search(keyword), 15000);
+            if (result.status !== "FOUND") return;
+
             const foundPrice = parseFloat(result.price);
-            if (isNaN(foundPrice)) return null;
+            if (isNaN(foundPrice)) return;
 
-            const response = {
+            return {
               name: `${result.name} (${result.link})`,
               price: foundPrice.toString(),
               serial: result.serial || null,
               ip,
               timestamp,
+              site: site.name,
               gianhap: hasPrice ? priceOrigin.toString() : "0.0",
               tilechenhlech: hasPrice ? calculateDifference(priceOrigin, foundPrice).toString() : "0.0"
             };
-
-            return response;
+          } catch (err) {
+            console.error(`❌ Lỗi tại site "${site.name}" với '${keyword}':`, err.message);
           }
-        } catch (err) {
-          console.error(`❌ Lỗi tại site "${site.name}":`, err.message);
-        }
-        return null;
-      });
-
-      const siteResults = await Promise.allSettled(sitePromises);
-      return siteResults
-        .filter((result) => result.status === "fulfilled" && result.value)
-        .map((result) => result.value);
-    });
-
-    const allResults = await Promise.allSettled(keywordPromises);
-    allResults.forEach((result) => {
-      if (result.status === "fulfilled") {
-        output.push(...result.value);
+        });
       }
-    });
+    }
 
+    const output = await batchExecute(allTasks, 2);
     res.json({ status: "success", data: output });
   } catch (err) {
     console.error("❌ Lỗi tổng:", err.message);
