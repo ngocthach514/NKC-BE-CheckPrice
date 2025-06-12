@@ -1,5 +1,25 @@
+require("dotenv").config();
 const fs = require('fs');
 const path = require('path');
+const agent = require("https-proxy-agent");
+
+function getAxiosWithProxy() {
+  const axios = require("axios");
+  if (!process.env.PROXY_HOST || !process.env.PROXY_PORT) return axios;
+
+  const proxyAgent = new agent.HttpsProxyAgent({
+    host: process.env.PROXY_HOST,
+    port: parseInt(process.env.PROXY_PORT),
+    auth: process.env.PROXY_USERNAME && process.env.PROXY_PASSWORD
+      ? `${process.env.PROXY_USERNAME}:${process.env.PROXY_PASSWORD}`
+      : undefined,
+  });
+
+  return axios.create({
+    httpsAgent: proxyAgent,
+    proxy: false,
+  });
+}
 
 const sqlFilePath = path.join(__dirname, 'tool_check_price.sql');
 const outputDir = path.join(__dirname, 'handlers', 'api');
@@ -30,7 +50,6 @@ for (const entry of apiEntries) {
   const fileName = `${namePart}-${domainPart}Handler.js`;
   const filePath = path.join(outputDir, fileName);
 
-  // Hàm template logic riêng cho HÀ VIỆT (nếu json là array of objects)
   const isArrayJson = jsonRaw.trim().startsWith('[');
   const customLogic = isArrayJson ? `
     const result = Array.isArray(json) ? json[0] : null;
@@ -64,6 +83,7 @@ const BaseHandler = require('../BaseHandler');
 class ${className} extends BaseHandler {
   async search(keyword) {
     const url = this.site.api_url.replace('{keyword}', encodeURIComponent(keyword));
+    const axios = getAxiosWithProxy();
     const res = await axios.get(url);
     const json = res.data;
 

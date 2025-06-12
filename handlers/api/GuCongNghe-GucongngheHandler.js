@@ -1,4 +1,5 @@
-const axios = require('axios');
+const getAxiosWithProxy = require("../getAxiosWithProxy");
+const axios = getAxiosWithProxy();
 const BaseHandler = require('../BaseHandler');
 
 class GuCongNgheGucongngheHandler extends BaseHandler {
