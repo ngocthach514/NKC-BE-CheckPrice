@@ -1,5 +1,4 @@
 const express = require("express");
-const path = require("path");
 const app = express();
 const searchRouter = require("./routes/search");
 
@@ -8,17 +7,15 @@ require("dotenv").config();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Route API
+// Chỉ dùng API
 app.use("/api", searchRouter);
 
-// Nếu vẫn muốn phục vụ frontend:
-app.use(express.static(path.join(__dirname, "public")));
-
+// Trang root mặc định trả JSON
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  res.json({ status: "ok", message: "CheckGia API is running." });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3033;
 app.listen(PORT, () => {
   console.log(`✅ Server is running at http://localhost:${PORT}`);
 });

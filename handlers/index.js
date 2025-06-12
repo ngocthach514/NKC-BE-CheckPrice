@@ -40,9 +40,11 @@ function getHandler(site) {
     return new htmlHandlers[key](site);
   }
 
-  console.warn(`⚠️ Không tìm thấy handler cho site: ${site.name} (${key})`);
-  return new BaseHandler(site);
+  const message = `❌ Không tìm thấy handler cho site: "${site.name}" (handler_key: "${key}")`;
+  console.error(message);
+  throw new Error(message);
 }
+
 
 function getDomain(url) {
   try {
