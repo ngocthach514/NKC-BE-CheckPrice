@@ -8,10 +8,10 @@ router.get("/", async (req, res) => {
     const [sites] = await db.query(`
       SELECT id, name, handler_key, has_api, url 
       FROM websites 
-      WHERE has_api = 1 AND handler_key IS NOT NULL
+      WHERE handler_key IS NOT NULL
     `);
 
-    const results = sites.map(site => {
+    const results = sites.map((site) => {
       try {
         const handler = getHandler(site);
         const valid = handler && typeof handler.search === "function";
@@ -20,7 +20,9 @@ router.get("/", async (req, res) => {
           id: site.id,
           name: site.name,
           handler_key: site.handler_key,
-          status: valid ? "✅ OK" : "❌ INVALID (không có hàm search)",
+          status: valid
+            ? "✅ HỢP LỆ: Handler hoạt động tốt"
+            : "❌ KHÔNG HỢP LỆ: Không có hàm tìm kiếm (search)",
           has_search: valid
         };
       } catch (err) {
@@ -28,16 +30,24 @@ router.get("/", async (req, res) => {
           id: site.id,
           name: site.name,
           handler_key: site.handler_key,
-          status: `❌ ERROR: ${err.message}`,
+          status: `❌ LỖI: ${err.message}`,
           has_search: false
         };
       }
     });
 
-    res.json({ success: true, total: results.length, data: results });
+    res.json({
+      success: true,
+      message: "Kiểm tra handler hoàn tất",
+      total: results.length,
+      data: results
+    });
   } catch (err) {
-    console.error("❌ Error checking handlers:", err.message);
-    res.status(500).json({ success: false, message: "Failed to check handlers." });
+    console.error("❌ Lỗi khi kiểm tra handler:", err.message);
+    res.status(500).json({
+      success: false,
+      message: "Không thể kiểm tra handler. Vui lòng thử lại sau."
+    });
   }
 });
 

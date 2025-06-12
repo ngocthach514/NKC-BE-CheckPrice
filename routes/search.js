@@ -17,7 +17,7 @@ function getClientIp(req) {
   );
 }
 
-async function batchExecute(tasks = [], batchSize = 5) {
+async function batchExecute(tasks = [], batchSize = 10) {
   const results = [];
   for (let i = 0; i < tasks.length; i += batchSize) {
     const batch = tasks.slice(i, i + batchSize);
@@ -39,9 +39,7 @@ router.get("/search", async (req, res) => {
 
   const pairs = q.split("|").map((p) => p.split(","));
   if (pairs.length > 10) {
-    return res
-      .status(400)
-      .json({ error: "Tối đa 10 từ khóa mỗi truy vấn" });
+    return res.status(400).json({ error: "Tối đa 10 từ khóa mỗi truy vấn" });
   }
 
   const connection = await pool.getConnection();
@@ -95,10 +93,10 @@ router.get("/search", async (req, res) => {
       }
     }
 
-    const output = await batchExecute(allTasks, 2);
+    const output = await batchExecute(allTasks, 10);
     res.json({ status: "success", data: output });
   } catch (err) {
-    console.error("❌ Lỗi tổng:", err.message);
+    console.error("❌ Lỗi tổng:", err.stack || err.message);
     res.status(500).json({ error: "Internal server error" });
   } finally {
     connection.release();

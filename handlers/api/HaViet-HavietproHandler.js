@@ -11,7 +11,6 @@ const userAgents = [
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Safari/605.1.15"
 ];
 
-const randomDelay = () => new Promise(resolve => setTimeout(resolve, Math.floor(Math.random() * 2000) + 1000));
 const getRandomUserAgent = () => userAgents[Math.floor(Math.random() * userAgents.length)];
 
 class HaVietHavietproHandler extends BaseHandler {
@@ -23,16 +22,28 @@ class HaVietHavietproHandler extends BaseHandler {
     console.log(`🔍 Bắt đầu cho site: ${this.site.name}`);
     let browser;
     try {
-      await randomDelay();
       const url = this.site.api_url.replace("{keyword}", encodeURIComponent(keyword));
+
       browser = await puppeteer.launch({
-        headless: "new",
+        headless: true,
         args: ["--no-sandbox", "--disable-setuid-sandbox"],
         ignoreHTTPSErrors: true
       });
 
       const page = await browser.newPage();
-      await page.setViewport({ width: 1280 + Math.floor(Math.random() * 100), height: 800 + Math.floor(Math.random() * 100) });
+
+      // ⏱️ Chặn tài nguyên không cần thiết
+      await page.setRequestInterception(true);
+      page.on("request", req => {
+        const type = req.resourceType();
+        if (["image", "stylesheet", "font", "media"].includes(type)) {
+          req.abort();
+        } else {
+          req.continue();
+        }
+      });
+
+      await page.setViewport({ width: 1280, height: 800 });
       await page.setUserAgent(getRandomUserAgent());
       await page.setExtraHTTPHeaders({
         Accept: "application/json, text/plain, */*",
@@ -41,8 +52,6 @@ class HaVietHavietproHandler extends BaseHandler {
         Connection: "keep-alive"
       });
 
-      await page.goto(this.site.url, { waitUntil: "networkidle2" });
-      await randomDelay();
       await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
 
       const bodyContent = await page.evaluate(() => document.body.textContent);
@@ -60,7 +69,9 @@ class HaVietHavietproHandler extends BaseHandler {
 
       if (!product) return this._notFound(json.length, keyword);
 
-      const productUrl = product.productUrl?.startsWith("http") ? product.productUrl : `${this.site.url.replace(/\/$/, "")}${product.productUrl || ""}`;
+      const productUrl = product.productUrl?.startsWith("http")
+        ? product.productUrl
+        : `${this.site.url.replace(/\/$/, "")}${product.productUrl || ""}`;
 
       await page.goto(productUrl, { waitUntil: "networkidle2", timeout: 60000 });
       await this._handleLocationPopup(page);
@@ -70,7 +81,7 @@ class HaVietHavietproHandler extends BaseHandler {
         await page.waitForFunction(() => {
           const el = document.querySelector(".price .red-co");
           return el && el.innerText.trim() !== "Liên hệ";
-        }, { timeout: 8000 });
+        }, { timeout: 5000 });
 
         const rawPrice = await page.$eval(".price .red-co", el => el.textContent.trim());
         price = normalizePrice(rawPrice);
@@ -108,7 +119,6 @@ class HaVietHavietproHandler extends BaseHandler {
         }
       });
       await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 10000 });
-      await randomDelay();
     } catch {}
   }
 
