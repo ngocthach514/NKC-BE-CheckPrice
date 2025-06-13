@@ -1,6 +1,7 @@
 const getAxiosWithProxy = require("../getAxiosWithProxy");
 const axios = getAxiosWithProxy();
 const BaseHandler = require("../BaseHandler");
+const { normalizePrice } = require("../../utils/price");
 
 class MaiNguyenWwwHandler extends BaseHandler {
   constructor(site) {
@@ -55,25 +56,6 @@ class MaiNguyenWwwHandler extends BaseHandler {
       return { status: 'ERROR', error: err.message };
     }
   }
-}
-
-function normalizePrice(input) {
-  if (!input) return "0.0";
-  let text = String(input).toLowerCase().trim();
-
-  if (text.includes('triệu')) {
-    const num = parseFloat(text);
-    return isNaN(num) ? "0.0" : (num * 1_000_000).toFixed(1);
-  }
-  if (text.includes('nghìn')) {
-    const num = parseFloat(text);
-    return isNaN(num) ? "0.0" : (num * 1_000).toFixed(1);
-  }
-
-  text = text.replace(/\./g, '').replace(/,/g, '.');
-  const cleaned = text.replace(/[^0-9.]/g, '');
-  const parsed = parseFloat(cleaned);
-  return isNaN(parsed) ? "0.0" : parsed.toFixed(1);
 }
 
 module.exports = MaiNguyenWwwHandler;

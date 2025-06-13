@@ -1,6 +1,7 @@
 const getAxiosWithProxy = require("../getAxiosWithProxy");
 const axios = getAxiosWithProxy();
 const BaseHandler = require('../BaseHandler');
+const { normalizePrice, stripHTML } = require('../../utils/price');
 
 class GuCongNgheGucongngheHandler extends BaseHandler {
   constructor(site) {
@@ -30,9 +31,11 @@ class GuCongNgheGucongngheHandler extends BaseHandler {
       }
 
       const name = product.value || '[không có tên]';
-      const rawPrice = stripHTML(product.price || '');
-      const price = normalizePrice(rawPrice);
+      const rawPrice = product.price || '';
+      const cleanPrice = stripHTML(rawPrice);
+      const price = normalizePrice(cleanPrice);
       const link = product.url || '';
+      const serial = product.sku || product.productModel || product.code || name;
 
       console.log(`✅ Kết quả cho site ${this.site.name}: ${name} | Giá: ${price}`);
       console.log(`🔚 Kết thúc site ${this.site.name}`);
@@ -42,6 +45,7 @@ class GuCongNgheGucongngheHandler extends BaseHandler {
         name,
         price,
         link,
+        serial,
         status: 'FOUND'
       };
     } catch (err) {
@@ -51,31 +55,6 @@ class GuCongNgheGucongngheHandler extends BaseHandler {
       return { status: 'ERROR', error: err.message };
     }
   }
-}
-
-function stripHTML(html) {
-  return typeof html === 'string'
-    ? html.replace(/<[^>]*>/g, '').trim()
-    : html;
-}
-
-function normalizePrice(input) {
-  if (!input) return "0.0";
-  let text = String(input).toLowerCase().trim();
-
-  if (text.includes('triệu')) {
-    const num = parseFloat(text);
-    return isNaN(num) ? "0.0" : (num * 1_000_000).toFixed(1);
-  }
-  if (text.includes('nghìn')) {
-    const num = parseFloat(text);
-    return isNaN(num) ? "0.0" : (num * 1_000).toFixed(1);
-  }
-
-  text = text.replace(/\./g, '').replace(/,/g, '.');
-  const cleaned = text.replace(/[^0-9.]/g, '');
-  const parsed = parseFloat(cleaned);
-  return isNaN(parsed) ? "0.0" : parsed.toFixed(1);
 }
 
 module.exports = GuCongNgheGucongngheHandler;

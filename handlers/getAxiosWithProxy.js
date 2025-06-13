@@ -4,15 +4,20 @@ const { HttpsProxyAgent } = require("https-proxy-agent");
 module.exports = function getAxiosWithProxy() {
   const axios = require("axios");
 
-  if (!process.env.PROXY_HOST || !process.env.PROXY_PORT) return axios;
+  const {
+    PROXY_HOST,
+    PROXY_PORT,
+    PROXY_USERNAME,
+    PROXY_PASSWORD,
+  } = process.env;
 
-  const agent = new HttpsProxyAgent({
-    host: process.env.PROXY_HOST,
-    port: parseInt(process.env.PROXY_PORT),
-    auth: process.env.PROXY_USERNAME && process.env.PROXY_PASSWORD
-      ? `${process.env.PROXY_USERNAME}:${process.env.PROXY_PASSWORD}`
-      : undefined,
-  });
+  if (!PROXY_HOST || !PROXY_PORT) return axios;
+
+  const proxyUrl = PROXY_USERNAME && PROXY_PASSWORD
+    ? `http://${encodeURIComponent(PROXY_USERNAME)}:${encodeURIComponent(PROXY_PASSWORD)}@${PROXY_HOST}:${PROXY_PORT}`
+    : `http://${PROXY_HOST}:${PROXY_PORT}`;
+
+  const agent = new HttpsProxyAgent(proxyUrl);
 
   return axios.create({
     httpsAgent: agent,

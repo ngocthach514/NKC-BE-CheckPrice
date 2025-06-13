@@ -1,6 +1,7 @@
 const puppeteer = require("puppeteer-extra");
 const StealthPlugin = require("puppeteer-extra-plugin-stealth");
 const BaseHandler = require("../BaseHandler");
+const { normalizePrice } = require("../../utils/price");
 
 puppeteer.use(StealthPlugin());
 
@@ -32,7 +33,6 @@ class HaVietHavietproHandler extends BaseHandler {
 
       const page = await browser.newPage();
 
-      // ⏱️ Chặn tài nguyên không cần thiết
       await page.setRequestInterception(true);
       page.on("request", req => {
         const type = req.resourceType();
@@ -131,16 +131,6 @@ class HaVietHavietproHandler extends BaseHandler {
     console.log(`❌ LỖI tại site ${this.site.name}: ${message}`);
     return { status: "ERROR", error: message };
   }
-}
-
-function normalizePrice(input) {
-  if (!input) return "0.0";
-  let text = String(input).toLowerCase().trim();
-  if (text.includes("triệu")) return (parseFloat(text) * 1_000_000 || 0).toFixed(1);
-  if (text.includes("nghìn")) return (parseFloat(text) * 1_000 || 0).toFixed(1);
-  const cleaned = text.replace(/[.,]/g, m => (m === ',' ? '.' : '')).replace(/[^0-9.]/g, '');
-  const parsed = parseFloat(cleaned);
-  return isNaN(parsed) ? "0.0" : parsed.toFixed(1);
 }
 
 module.exports = HaVietHavietproHandler;

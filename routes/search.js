@@ -3,11 +3,13 @@ const router = express.Router();
 const pool = require("../db");
 const { getHandler } = require("../handlers");
 
+// 🔢 Tính phần trăm chênh lệch
 function calculateDifference(original, current) {
   const diff = ((current - original) / original) * 100;
   return parseFloat(diff.toFixed(2));
 }
 
+// 🧠 Lấy IP thật
 function getClientIp(req) {
   return (
     req.headers["x-forwarded-for"]?.split(",")[0] ||
@@ -17,6 +19,7 @@ function getClientIp(req) {
   );
 }
 
+// ⚙️ Chạy các tác vụ theo lô
 async function batchExecute(tasks = [], batchSize = 10) {
   const results = [];
   for (let i = 0; i < tasks.length; i += batchSize) {
@@ -31,12 +34,15 @@ async function batchExecute(tasks = [], batchSize = 10) {
   return results;
 }
 
+// 🧩 Endpoint /search
 router.get("/search", async (req, res) => {
   const { q } = req.query;
+
   if (!q || q.trim() === "") {
     return res.status(400).json({ error: "Query parameter 'q' is required" });
   }
 
+  // Hỗ trợ nhiều cặp keyword,price ngăn cách bởi |
   const pairs = q.split("|").map((p) => p.split(","));
   if (pairs.length > 10) {
     return res.status(400).json({ error: "Tối đa 10 từ khóa mỗi truy vấn" });
@@ -44,14 +50,15 @@ router.get("/search", async (req, res) => {
 
   const connection = await pool.getConnection();
   const ip = getClientIp(req);
-  const timestamp = new Date(Date.now() + 7 * 60 * 60 * 1000)
+  const timestamp = new Date(Date.now() + 7 * 60 * 60 * 1000) // +7h VN
     .toISOString()
     .slice(0, 19)
     .replace("T", " ");
 
   try {
+    // ❗ Lấy toàn bộ site có handler_key, KHÔNG lọc has_api
     const [websites] = await connection.query(
-      "SELECT * FROM websites WHERE has_api = 1 AND handler_key IS NOT NULL"
+      "SELECT * FROM websites WHERE handler_key IS NOT NULL AND (has_api = 0 OR has_api = 1)"
     );
 
     const allTasks = [];
@@ -75,15 +82,15 @@ router.get("/search", async (req, res) => {
             if (isNaN(foundPrice)) return;
 
             return {
-              gianhap: hasPrice ? priceOrigin.toString() : "0.0",
-              ip,
+              serial: keyword,
               name: `${result.name} (${result.link})`,
               price: foundPrice.toString(),
-              serial: keyword,
+              gianhap: hasPrice ? priceOrigin.toString() : "0.0",
               tilechenhlech: hasPrice
                 ? calculateDifference(priceOrigin, foundPrice).toString()
                 : "0.0",
               timestamp,
+              ip,
               site: site.name,
             };
           } catch (err) {
@@ -98,7 +105,7 @@ router.get("/search", async (req, res) => {
 
     const output = await batchExecute(allTasks, 10);
 
-    res.json(Object.assign({ data: output }, { status: "success" }));
+    res.json({ status: "success", data: output });
   } catch (err) {
     console.error("❌ Lỗi tổng:", err.stack || err.message);
     res.status(500).json({ error: "Internal server error" });

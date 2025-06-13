@@ -1,6 +1,7 @@
 const getAxiosWithProxy = require("../getAxiosWithProxy");
 const axios = getAxiosWithProxy();
 const BaseHandler = require('../BaseHandler');
+const { normalizePrice } = require('../../utils/price');
 
 class GigaGigadigitalHandler extends BaseHandler {
   constructor(site) {
@@ -57,25 +58,6 @@ function extractFirstHref(html, siteUrl) {
   if (!html || typeof html !== 'string') return '';
   const matches = html.match(/<a\s[^>]*href="([^"]+)"[^>]*>/i);
   return matches?.[1]?.startsWith('http') ? matches[1] : `${siteUrl}${matches?.[1] || ''}`;
-}
-
-function normalizePrice(input) {
-  if (!input) return "0.0";
-  let text = String(input).toLowerCase().trim();
-
-  if (text.includes('triệu')) {
-    const num = parseFloat(text);
-    return isNaN(num) ? "0.0" : (num * 1_000_000).toFixed(1);
-  }
-  if (text.includes('nghìn')) {
-    const num = parseFloat(text);
-    return isNaN(num) ? "0.0" : (num * 1_000).toFixed(1);
-  }
-
-  text = text.replace(/\./g, '').replace(/,/g, '.');
-  const cleaned = text.replace(/[^0-9.]/g, '');
-  const parsed = parseFloat(cleaned);
-  return isNaN(parsed) ? "0.0" : parsed.toFixed(1);
 }
 
 module.exports = GigaGigadigitalHandler;
