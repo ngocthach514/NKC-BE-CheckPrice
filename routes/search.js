@@ -105,7 +105,7 @@ router.get("/search", async (req, res) => {
 
     const output = await batchExecute(allTasks, 10);
 
-    res.json({ status: "success", data: output });
+    res.json({ data: output, status: "success" });
   } catch (err) {
     console.error("❌ Lỗi tổng:", err.stack || err.message);
     res.status(500).json({ error: "Internal server error" });
