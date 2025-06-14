@@ -2,6 +2,7 @@ const puppeteer = require("puppeteer-extra");
 const StealthPlugin = require("puppeteer-extra-plugin-stealth");
 const BaseHandler = require("../BaseHandler");
 const { normalizePrice } = require("../../utils/price");
+const { waitForSelectorRetry } = require("../../utils/wait");
 
 puppeteer.use(StealthPlugin());
 
@@ -26,9 +27,11 @@ class HoplongHoplongtechHandler extends BaseHandler {
       await page.type(".search-form__input > input", term);
       await page.keyboard.press("Enter");
 
-      await page.waitForSelector("#product-list > .product-list__item", {
-        timeout: 20000,
-      });
+      const ok = await waitForSelectorRetry(page, "#product-list > .product-list__item");
+      if (!ok) {
+        console.log("❌ Không tìm thấy selector sản phẩm sau nhiều lần thử");
+        return { status: "NOT_FOUND" };
+      }
 
       const product = await page.evaluate((term) => {
         let found = null;

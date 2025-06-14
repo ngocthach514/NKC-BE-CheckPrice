@@ -2,6 +2,7 @@ const BaseHandler = require("../BaseHandler");
 const puppeteer = require("puppeteer-extra");
 const StealthPlugin = require("puppeteer-extra-plugin-stealth");
 const { normalizePrice } = require("../../utils/price");
+const { waitForSelectorRetry } = require("../../utils/wait");
 require("dotenv").config();
 
 puppeteer.use(StealthPlugin());
@@ -33,32 +34,40 @@ class AkiaAkiaHandler extends BaseHandler {
       const searchUrl = `${this.site.url}?s=${encodeURIComponent(keyword)}&post_type=product`;
       console.log(`🔎 Tìm kiếm sản phẩm: ${searchUrl}`);
 
-      const [response] = await Promise.all([
-        page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 30000 }),
-        page.goto(searchUrl, { waitUntil: "domcontentloaded", timeout: 30000 }),
-      ]);
+      await page.goto(searchUrl, { waitUntil: "networkidle2", timeout: 30000 });
 
-      const found = await page.$("li.product a.woocommerce-LoopProduct-link");
-      if (!found) {
-        console.log(`❌ Không tìm thấy selector sản phẩm`);
-        return { status: "NOT_FOUND" };
-      }
+      const productLink = await page.evaluate((keyword) => {
+        function toPlainText(str) {
+          return str
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase();
+        }
 
-      const productLink = await page.evaluate(() => {
-        return document.querySelector("li.product a.woocommerce-LoopProduct-link")?.href || null;
-      });
+        const normKeyword = toPlainText(keyword);
+        const words = normKeyword.split(" ").filter(w => w.length > 2);
+
+        return Array.from(document.querySelectorAll("[data-yotpo-url]"))
+          .map(el => el.getAttribute("data-yotpo-url"))
+          .find(url => {
+            const normUrl = toPlainText(url);
+            return words.every(word => normUrl.includes(word));
+          });
+      }, keyword);
 
       if (!productLink) {
-        console.log(`❌ Không có link sản phẩm`);
+        console.log("❌ Không tìm thấy link sản phẩm từ data-yotpo-url");
         return { status: "NOT_FOUND" };
       }
 
-      console.log(`→ Found product: ${productLink}`);
+      console.log(`→ Tìm thấy link sản phẩm: ${productLink}`);
+      await page.goto(productLink, { waitUntil: "networkidle2", timeout: 30000 });
 
-      await Promise.all([
-        page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 30000 }),
-        page.goto(productLink, { waitUntil: "domcontentloaded", timeout: 30000 }),
-      ]);
+      const ok = await waitForSelectorRetry(page, ".product_title, h1.product-title");
+      if (!ok) {
+        console.log("❌ Không tìm thấy tiêu đề sản phẩm sau nhiều lần thử");
+        return { status: "NOT_FOUND" };
+      }
 
       const data = await page.evaluate(() => {
         const name =
