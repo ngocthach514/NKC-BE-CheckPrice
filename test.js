@@ -3,21 +3,21 @@ const StealthPlugin = require("puppeteer-extra-plugin-stealth");
 
 puppeteer.use(StealthPlugin());
 
-// Hàm chuẩn hóa giá dành riêng cho Wanbo.vn
-function normalizeWanboPrice(input) {
-  if (!input || typeof input !== 'string') return 0.0;
+function normalizePrice(input) {
+  if (!input || typeof input !== "string") return 0.0;
 
   const cleaned = input
-    .replace(/[₫đ\s]/gi, '')   // bỏ ký hiệu tiền, khoảng trắng
-    .replace(/\./g, '')        // bỏ dấu chấm
-    .replace(/,/g, '');        // bỏ dấu phẩy
+    .replace(/[₫đ\s]/gi, '')
+    .replace(/\./g, '')
+    .replace(/,/g, '');
 
   const num = parseFloat(cleaned);
   return isNaN(num) ? 0.0 : num;
 }
 
 (async () => {
-  const url = "https://wanbo.vn/san-pham/may-chieu-xiaomi-wanbo-vali-1-model-2025/";
+  const keyword = "CK-902";
+  const searchUrl = `https://mrweekend.vn/search?q=${encodeURIComponent(keyword)}&type=product`;
 
   const browser = await puppeteer.launch({
     headless: false,
@@ -27,36 +27,59 @@ function normalizeWanboPrice(input) {
   const page = await browser.newPage();
 
   try {
-    console.log("🔎 Truy cập:", url);
-    await page.goto(url, { waitUntil: "networkidle2" });
+    console.log("🔎 Truy cập:", searchUrl);
+    await page.goto(searchUrl, { waitUntil: "networkidle2" });
 
-    await page.waitForSelector(".zek_detail_info", { timeout: 10000 });
+    await page.waitForSelector(".grid-uniform .grid__item", { timeout: 10000 });
 
-    const data = await page.evaluate(() => {
-      const wrap = document.querySelector(".zek_detail_info");
+    const result = await page.evaluate((keyword) => {
+      function toPlain(str) {
+        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      }
 
-      const name = wrap.querySelector("h1.product_title")?.innerText.trim() || null;
+      const keywordNorm = toPlain(keyword);
 
-      const priceText = wrap.querySelector("p.price ins .amount")?.innerText.trim()
-                      || wrap.querySelector("p.price .amount")?.innerText.trim()
-                      || null;
+      const items = Array.from(document.querySelectorAll(".grid-uniform .grid__item"));
+      let bestMatch = null;
+      let exactMatchScore = Infinity;
 
-      const originalPriceText = wrap.querySelector("p.price del .amount")?.innerText.trim() || null;
+      for (let el of items) {
+        const nameEl = el.querySelector(".product-name h2");
+        const priceEl = el.querySelector(".current-price");
+        const linkEl = el.querySelector(".a-product__image a");
 
-      const link = wrap.querySelector("form.cart")?.getAttribute("action") || window.location.href;
+        if (!nameEl || !priceEl || !linkEl) continue;
 
-      return { name, priceText, originalPriceText, link };
-    });
+        const name = nameEl.innerText.trim();
+        const priceText = priceEl.innerText.trim();
+        const link = linkEl.href.startsWith("http") ? linkEl.href : "https://mrweekend.vn" + linkEl.getAttribute("href");
 
-    const result = {
-      name: data.name,
-      price: normalizeWanboPrice(data.priceText),
-      original_price: normalizeWanboPrice(data.originalPriceText),
-      link: data.link
-    };
+        const normName = toPlain(name);
+        const index = normName.indexOf(keywordNorm);
 
-    console.log("🎯 Kết quả:", result);
+        if (index !== -1 && index < exactMatchScore) {
+          exactMatchScore = index;
+          bestMatch = { name, priceText, link };
+        }
+      }
+
+      return bestMatch;
+    }, keyword);
+
+    if (!result) {
+      console.log("❌ Không tìm thấy sản phẩm khớp keyword.");
+    } else {
+      console.log("🎯 Kết quả:", {
+        name: result.name,
+        price: normalizePrice(result.priceText),
+        price_text: result.priceText,
+        link: result.link
+      });
+    }
+
   } catch (err) {
     console.error("❌ Lỗi:", err.message);
+  } finally {
+    await browser.close();
   }
 })();
